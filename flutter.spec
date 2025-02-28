@@ -10,19 +10,21 @@ License:        BSD
 URL:            https://flutter.dev/
 
 Source0:        https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_%{flutter_version}-stable.tar.xz
-
-# This patch modifies Flutter to use the system Dart if we want to avoid bundled Dart
-# Patch0:         flutter-use-system-dart.patch
+# Disable analytics during build
+Source1:        analytics_disabled
 
 BuildRequires:  tar
 BuildRequires:  xz
-# Uncomment if using system Dart instead of bundled Dart
-# BuildRequires:  dart >= 3.2.0
+BuildRequires:  git
+BuildRequires:  wget
+BuildRequires:  unzip
+BuildRequires:  ca-certificates
+# Runtime dependencies
 Requires:       git
 Requires:       curl
 Requires:       unzip
 Requires:       which
-Requires:       xz-utils
+Requires:       xz
 Requires:       libglu
 Requires:       libstdc++
 Requires:       fontconfig
@@ -30,6 +32,11 @@ Requires:       cmake
 Requires:       clang
 Requires:       ninja-build
 Requires:       gtk3-devel
+# Network is disabled at build time in COPR
+BuildRequires:  network-online
+%if 0%{?fedora} >= 41
+BuildRequires:  kernel-modules-core
+%endif
 ExclusiveArch:  x86_64
 
 %description
@@ -41,25 +48,13 @@ organizations around the world, and is free and open source.
 %prep
 %setup -q -n flutter
 
-# If using system Dart, apply the patch
-# %patch0 -p1
+# Create a mock config directory to disable analytics
+mkdir -p .config
 
 %build
-# Nothing to build initially, Flutter downloads additional components on first run
-# We'll pre-download components to include in the package
-
-# Configure Flutter to use the bundled Dart SDK
-export FLUTTER_ROOT=$(pwd)
-export PATH=$FLUTTER_ROOT/bin:$PATH
-
-# Disable analytics for the build
-flutter config --no-analytics
-
-# Pre-download some components (cache Flutter tool, Dart SDK, etc.)
-flutter precache --linux
-
-# Download engine artifacts and tools
-flutter doctor
+# No traditional build - Flutter is distributed as prebuilt binaries
+# We avoid running flutter commands that require network access
+# as COPR has limited network connectivity during builds
 
 %install
 # Create directories
@@ -68,6 +63,10 @@ mkdir -p %{buildroot}%{_bindir}
 
 # Copy the entire Flutter directory
 cp -a ./* %{buildroot}%{_datadir}/%{name}/
+
+# Create .config directory with analytics disabled
+mkdir -p %{buildroot}%{_datadir}/%{name}/.config
+cp -a %{SOURCE1} %{buildroot}%{_datadir}/%{name}/.config/
 
 # Remove unnecessary files for smaller package
 rm -rf %{buildroot}%{_datadir}/%{name}/.git
@@ -78,8 +77,22 @@ rm -rf %{buildroot}%{_datadir}/%{name}/.github
 ln -sf %{_datadir}/%{name}/bin/flutter %{buildroot}%{_bindir}/flutter
 ln -sf %{_datadir}/%{name}/bin/dart %{buildroot}%{_bindir}/flutter-dart
 
+# Create a wrapper script that runs flutter precache on first use
+cat > %{buildroot}%{_bindir}/flutter-setup << 'EOF'
+#!/bin/bash
+echo "Performing first-time Flutter setup..."
+flutter precache --linux
+flutter doctor
+echo "Flutter setup complete!"
+EOF
+chmod +x %{buildroot}%{_bindir}/flutter-setup
+
+%post
+echo "Flutter has been installed. For first-time setup, run 'flutter-setup'"
+
 %files
 %license LICENSE
 %{_bindir}/flutter
 %{_bindir}/flutter-dart
+%{_bindir}/flutter-setup
 %{_datadir}/%{name}/
