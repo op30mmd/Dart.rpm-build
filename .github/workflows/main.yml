@@ -2,39 +2,94 @@ name: Build Dart SDK RPM
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  release:
+    types: [ created ]
 
 jobs:
-  build:
+  build-rpm:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Clone depot_tools
-        run: git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git $HOME/depot_tools
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3 rpm build-essential git curl
 
-      - name: Add depot_tools to PATH
-        run: echo "$HOME/depot_tools" >> $GITHUB_PATH
+    - name: Install depot_tools
+      run: |
+        git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+        echo "$(pwd)/depot_tools" >> $GITHUB_PATH
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build build-essential rpm
-          sudo gem install fpm
+    - name: Fetch Dart SDK source
+      run: |
+        fetch dart
+        cd dart
+        gclient sync  # <button class="citation-flag" data-index="4">
 
-      - name: Sync dependencies
-        run: gclient sync
+    - name: Build Dart SDK
+      working-directory: dart
+      run: |
+        ./tools/build.py --mode=release --arch=x64 create_sdk  # <button class="citation-flag" data-index="6">
 
-      - name: Build Dart SDK
-        run: python3 tools/build.py -m release -a x64 create_sdk
+    - name: Prepare RPM build environment
+      run: |
+        mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+        echo '%_topdir %(echo $HOME)/rpmbuild' > ~/.rpmmacros
 
-      - name: Create RPM package
-        run: python3 tools/linux_dist_support/create_rpm_package.py --sdk_dir out/ReleaseX64/dart-sdk --out_dir rpm_output
+    - name: Create RPM spec file
+      run: |
+        cat <<EOF > ~/rpmbuild/SPECS/dart.spec
+        Name:           dart
+        Version:        3.5.0
+        Release:        1%{?dist}
+        Summary:        Dart SDK
 
-      - name: Upload RPM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dart-sdk-rpm
-          path: rpm_output/*.rpm
+        License:        BSD-3-Clause
+        URL:            https://dart.dev
+        Source0:        %{name}-%{version}.tar.gz
+
+        BuildRequires:  python3, rpm-build
+        Requires:       python3
+
+        %description
+        Dart SDK for RPM-based systems
+
+        %prep
+        %setup -q
+
+        %build
+        # Build commands here if needed
+
+        %install
+        mkdir -p %{buildroot}/usr/lib/dart
+        cp -r ./* %{buildroot}/usr/lib/dart/
+
+        %files
+        /usr/lib/dart
+
+        %changelog
+        * Sat Mar 01 2025 Your Name <email@example.com> - 3.5.0-1
+        - Initial package
+        EOF
+
+    - name: Package RPM
+      run: |
+        rpmbuild -ba ~/rpmbuild/SPECS/dart.spec
+
+    - name: Upload RPM artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dart-sdk-rpm
+        path: ~/rpmbuild/RPMS/x86_64/*.rpm
+
+    - name: Publish Release (if triggered)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ~/rpmbuild/RPMS/x86_64/*.rpm
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
