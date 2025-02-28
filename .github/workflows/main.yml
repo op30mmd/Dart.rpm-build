@@ -34,7 +34,7 @@ jobs:
         run: python3 tools/linux_dist_support/create_rpm_package.py --sdk_dir out/ReleaseX64/dart-sdk --out_dir rpm_output
 
       - name: Upload RPM artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dart-sdk-rpm
           path: rpm_output/*.rpm
