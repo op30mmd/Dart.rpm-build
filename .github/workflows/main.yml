@@ -6,7 +6,7 @@ on:
       dart_version:
         description: 'Dart SDK version to build'
         required: true
-        default: '3.2.0'
+        default: '3.7.1'
       architecture:
         description: 'Target architecture'
         required: true
@@ -178,7 +178,7 @@ jobs:
           ls -la ${{ github.workspace }}/artifacts/
 
       - name: Upload RPM as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dart-sdk-${{ env.DART_VERSION }}-${{ env.ARCHITECTURE }}-rpm
           path: ${{ github.workspace }}/artifacts/*.rpm
