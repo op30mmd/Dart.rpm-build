@@ -1,3 +1,5 @@
+%global _missing_build_ids_terminate_build 0
+
 Name:           flutter
 Version:        3.24.0
 Release:        1%{?dist}
