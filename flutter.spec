@@ -33,7 +33,6 @@ Requires:       clang
 Requires:       ninja-build
 Requires:       gtk3-devel
 # Network is disabled at build time in COPR
-BuildRequires:  network-online
 %if 0%{?fedora} >= 41
 BuildRequires:  kernel-modules-core
 %endif
