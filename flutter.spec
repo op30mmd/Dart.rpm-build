@@ -1,4 +1,6 @@
 %global _missing_build_ids_terminate_build 0
+%global debug_package %{nil}
+%global __debugsource_packages %{nil}
 
 Name:           flutter
 Version:        3.24.0
