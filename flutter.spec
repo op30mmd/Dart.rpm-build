@@ -11,13 +11,6 @@ License:        BSD-3-Clause
 URL:            https://flutter.dev
 Source0:        https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_%{version}-stable.tar.xz
 
-BuildRequires:  cmake
-BuildRequires:  ninja-build
-BuildRequires:  git
-BuildRequires:  clang
-BuildRequires:  pkgconfig(gtk+-3.0)
-BuildRequires:  pkgconfig(libsecret-1)
-BuildRequires:  pkgconfig(x11)
 Requires:       bash
 Requires:       dart
 Requires:       git
@@ -33,11 +26,6 @@ Flutter is Google's UI toolkit for building natively compiled applications for m
 
 %prep
 %setup -q -n flutter
-
-%build
-# Flutter manages its own build process; ensure it’s set up correctly
-bin/flutter config --no-analytics
-bin/flutter doctor
 
 %install
 # Install Flutter to /opt/flutter in the build root
