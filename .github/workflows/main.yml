@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch: # Allows manual triggering
+  workflow_dispatch:
     inputs:
       dart_version:
         description: 'Dart SDK version to build (e.g., 3.3.0)'
@@ -16,9 +16,9 @@ on:
 
 jobs:
   build-rpm:
-    runs-on: ubuntu-latest # We'll use a container for Fedora
+    runs-on: ubuntu-latest
     container:
-      image: fedora:latest # RPM-based distro
+      image: fedora:latest
     steps:
       # Step 1: Install system dependencies
       - name: Install dependencies
@@ -26,43 +26,49 @@ jobs:
           dnf -y update
           dnf -y install git gcc g++ make python3 ninja-build rpm-build rpmdevtools
 
-      # Step 2: Checkout repository (if you have additional files like spec)
+      # Step 2: Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 3: Set up depot_tools
+      # Step 3: Set up depot_tools and persist PATH
       - name: Install depot_tools
         run: |
           git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
-          echo "export PATH=\$PATH:$(pwd)/depot_tools" >> $GITHUB_ENV
+          echo "$(pwd)/depot_tools" >> $GITHUB_PATH  # Persist PATH across steps
 
-      # Step 4: Clone Dart SDK
+      # Step 4: Verify depot_tools setup
+      - name: Verify gclient availability
+        run: |
+          which gclient || { echo "gclient not found"; exit 1; }
+          gclient --version
+
+      # Step 5: Clone Dart SDK
       - name: Clone Dart SDK
         run: |
           git clone https://github.com/dart-lang/sdk.git dart-sdk
           cd dart-sdk
           git checkout ${{ github.event.inputs.dart_version || 'main' }}
 
-      # Step 5: Sync dependencies with gclient
+      # Step 6: Sync dependencies with gclient
       - name: Sync Dart dependencies
         working-directory: dart-sdk
         run: |
           gclient sync
 
-      # Step 6: Build Dart SDK
+      # Step 7: Build Dart SDK
       - name: Build Dart SDK
         working-directory: dart-sdk
         run: |
           ./tools/build.py --mode release --arch x64 create_sdk
 
-      # Step 7: Prepare files for RPM
+      # Step 8: Prepare files for RPM
       - name: Prepare RPM structure
         run: |
           mkdir -p dart-rpm/usr/bin dart-rpm/usr/lib/dart
           cp dart-sdk/out/ReleaseX64/dart dart-rpm/usr/bin/
           cp -r dart-sdk/out/ReleaseX64/* dart-rpm/usr/lib/dart/
 
-      # Step 8: Create RPM spec file
+      # Step 9: Create RPM spec file
       - name: Generate RPM spec file
         run: |
           mkdir -p ~/rpmbuild/SPECS
@@ -97,14 +103,14 @@ jobs:
           - Auto-generated RPM package for Dart SDK
           EOF
 
-      # Step 9: Create source tarball and build RPM
+      # Step 10: Create source tarball and build RPM
       - name: Build RPM package
         run: |
           mkdir -p ~/rpmbuild/SOURCES
           tar -czvf ~/rpmbuild/SOURCES/dart-${{ github.event.inputs.dart_version || '3.3.0' }}.tar.gz dart-rpm
           rpmbuild -ba ~/rpmbuild/SPECS/dart.spec
 
-      # Step 10: Upload RPM as artifact
+      # Step 11: Upload RPM as artifact
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
