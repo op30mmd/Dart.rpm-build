@@ -1,6 +1,6 @@
 %global debug_package %{nil}
 %global __strip /bin/true
-%global flutter_version 3.19.5
+%global flutter_version 3.29.0
 
 Name:           flutter
 Version:        %{flutter_version}
